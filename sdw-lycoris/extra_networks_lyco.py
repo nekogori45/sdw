@@ -1,5 +1,6 @@
 from modules import extra_networks, shared
 import lycoris
+from lyco_logger import logger
 
 
 default_args = [
@@ -40,17 +41,21 @@ def parse_args(params:list):
 
 
 class ExtraNetworkLyCORIS(extra_networks.ExtraNetwork):
-    def __init__(self):
-        super().__init__('lyco')
+    def __init__(self, base_name = 'lyco'):
+        super().__init__(base_name)
+        self.base_name = base_name
         self.cache = ()
 
     def activate(self, p, params_list):
-        additional = shared.opts.sd_lyco
+        if self.base_name == 'lora':
+            additional = shared.opts.sd_lora
+        elif self.base_name == 'lyco':
+            additional = shared.opts.sd_lyco
 
         if additional != "" and additional in lycoris.available_lycos and len([x for x in params_list if x.items[0] == additional]) == 0:
             p.all_prompts = [
                 x + 
-                f"<lyco:{additional}:{shared.opts.extra_networks_default_multiplier}>" 
+                f"<{self.base_name}:{additional}:{shared.opts.extra_networks_default_multiplier}>" 
                 for x in p.all_prompts
             ]
             params_list.append(
@@ -80,14 +85,7 @@ class ExtraNetworkLyCORIS(extra_networks.ExtraNetwork):
         
         if all_lycos != self.cache:
             for name, te, unet, dyn in all_lycos:
-                print(
-                    "========================================\n"
-                    f"Apply LyCORIS model: {name}\n"
-                    f"Text encoder weight: {te}\n"
-                    f"Unet weight: {unet}\n"
-                    f"DyLoRA Dim: {dyn}"
-                )
-            print("========================================")
+                logger.debug(f"\nApply LyCORIS model: {name}: te={te}, unet={unet}, dyn={dyn}")
             self.cache = all_lycos
         lycoris.load_lycos(names, te_multipliers, unet_multipliers, dyn_dims)
 

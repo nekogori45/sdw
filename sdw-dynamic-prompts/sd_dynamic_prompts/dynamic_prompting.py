@@ -56,15 +56,8 @@ def get_wildcard_dir() -> Path:
     return wildcard_dir
 
 
-def get_prompts(p):
-    original_prompt = p.all_prompts[0] if len(p.all_prompts) > 0 else p.prompt
-    original_negative_prompt = (
-        p.all_negative_prompts[0]
-        if len(p.all_negative_prompts) > 0
-        else p.negative_prompt
-    )
-
-    return original_prompt, original_negative_prompt
+def _get_effective_prompt(prompts: list[str], prompt: str) -> str:
+    return prompts[0] if prompts else prompt
 
 
 device = devices.device
@@ -392,7 +385,28 @@ class Script(scripts.Script):
 
         fix_seed(p)
 
-        original_prompt, original_negative_prompt = get_prompts(p)
+        # Save original prompts before we touch `p.prompt`/`p.hr_prompt` etc.
+        original_prompt = _get_effective_prompt(p.all_prompts, p.prompt)
+        original_negative_prompt = _get_effective_prompt(
+            p.all_negative_prompts,
+            p.negative_prompt,
+        )
+        hr_fix_enabled = getattr(p, "enable_hr", False)
+
+        # all_hr_prompts (and the other hr prompt related stuff)
+        # is only available in AUTOMATIC1111 1.3.0+, but might not be in forks.
+        # Assume that if all_hr_prompts is available, the other hr prompt related stuff is too.
+        if hr_fix_enabled and hasattr(p, "all_hr_prompts"):
+            original_hr_prompt = _get_effective_prompt(p.all_hr_prompts, p.hr_prompt)
+            original_negative_hr_prompt = _get_effective_prompt(
+                p.all_hr_negative_prompts,
+                p.hr_negative_prompt,
+            )
+        else:
+            # If hr fix is not enabled, the HR prompts are effectively the same as the normal prompts
+            original_hr_prompt = original_prompt
+            original_negative_hr_prompt = original_negative_prompt
+
         original_seed = p.seed
         num_images = p.n_iter * p.batch_size
 
@@ -510,6 +524,14 @@ class Script(scripts.Script):
         p.prompt_for_display = original_prompt
         p.prompt = original_prompt
 
-        if getattr(p, "enable_hr", False):  # Hires fix?
-            p.all_hr_prompts = all_prompts
-            p.all_hr_negative_prompts = all_negative_prompts
+        if hr_fix_enabled:
+            p.all_hr_prompts = (
+                all_prompts
+                if original_prompt == original_hr_prompt
+                else len(all_prompts) * [original_hr_prompt]
+            )
+            p.all_hr_negative_prompts = (
+                all_negative_prompts
+                if original_negative_prompt == original_negative_hr_prompt
+                else len(all_negative_prompts) * [original_negative_hr_prompt]
+            )

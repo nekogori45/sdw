@@ -4,6 +4,10 @@ import gradio as gr
 import lycoris
 import extra_networks_lyco
 import ui_extra_networks_lyco
+
+import logging
+from lyco_logger import logger
+
 from modules import script_callbacks, ui_extra_networks, extra_networks, shared
 
 
@@ -17,8 +21,32 @@ def unload():
 
 
 def before_ui():
-    ui_extra_networks.register_page(ui_extra_networks_lyco.ExtraNetworksPageLyCORIS())
-    extra_networks.register_extra_network(extra_networks_lyco.ExtraNetworkLyCORIS())
+    if shared.cmd_opts.lyco_debug:
+        logger.setLevel(logging.DEBUG)
+        logger.debug("Set lyco ogger level to DEBUG")
+        
+    if shared.cmd_opts.lyco_patch_lora:
+        logger.warning('Triggered lyco-patch-lora, will take lora_dir and <lora> format.')
+        for idx, x in enumerate(ui_extra_networks.extra_pages):
+            if x.name=='lora':
+                break
+        else:
+            idx = -1
+        
+        if idx != -1:
+            ui_extra_networks.extra_pages.pop(idx)
+        
+        ui_extra_networks.register_page(ui_extra_networks_lyco.ExtraNetworksPageLyCORIS(
+            'lora'
+        ))
+        extra_networks.register_extra_network(extra_networks_lyco.ExtraNetworkLyCORIS(
+            'lora'
+        ))
+        lycoris.list_available_lycos(shared.cmd_opts.lora_dir)
+    else:
+        ui_extra_networks.register_page(ui_extra_networks_lyco.ExtraNetworksPageLyCORIS())
+        extra_networks.register_extra_network(extra_networks_lyco.ExtraNetworkLyCORIS())
+        lycoris.list_available_lycos(shared.cmd_opts.lyco_dir)
 
 
 if not hasattr(torch.nn, 'Linear_forward_before_lyco'):
