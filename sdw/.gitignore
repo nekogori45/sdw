@@ -37,3 +37,7 @@ notification.mp3
 /node_modules
 /package-lock.json
 /.coverage*
+
+#追加 除外設定は*が使えない？
+!/models/VAE-approx/
+!/models/VAE-approx/model.pt
